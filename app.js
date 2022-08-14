@@ -34,7 +34,9 @@ const io = require("socket.io")(server,
   const appFirebase = initializeApp(firebaseConfig);
   const db = getFirestore(appFirebase);
 
-
+  app.get('/', (req, res) => {
+    res.send("chat-app server is online"); 
+  })
 
 io.on('connection', function (socket) {
   serverLog("Connection Started ( Socket id: " + socket.id + " )");
