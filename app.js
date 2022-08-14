@@ -3,7 +3,7 @@ const express = require('express')
 const app = express()
 app.use(express.json())
 const { initializeApp } = require('firebase/app');
-const { getFirestore, collection, getDocs  , doc, setDoc} = require('firebase/firestore');
+const { getFirestore, collection, getDocs  , doc, setDoc , query , where , updateDoc , limit , orderBy} = require('firebase/firestore');
 const server = require('http').Server(app)
 const io = require("socket.io")(server,
   {
@@ -34,20 +34,22 @@ const io = require("socket.io")(server,
   const appFirebase = initializeApp(firebaseConfig);
   const db = getFirestore(appFirebase);
 
+
+
 io.on('connection', function (socket) {
   serverLog("Connection Started ( Socket id: " + socket.id + " )");
   socket.on("joinRoom",(data)=>{
-    const room1 = (data.friendId+ "/" + data.userId);
-    const room2 = (data.userId+ "/" + data.friendId);
+    const room1 = (data.userId+ "/" + data.friendId);
+    const room2 = (data.friendId+ "/" + data.userId);
     socket.join([room1, room2]);
-    // socket.emit('joinRoom')
   })
   
   socket.on('sendMessage', async function (data) {
-    // if (!chatInfo) return;
     if(!data && !data.message
       //  && !data.folderName
       ) return;
+      if(!data.friendId) return;
+      if(!data.userId) return;
     // let folderName = data.folderName;
     // let tempFiles = [];
     // if(folderName){
@@ -109,7 +111,9 @@ io.on('connection', function (socket) {
       //   if(!filesMoved) return;
       // }
 
-      if(newCityRef.id){
+      if(!newCityRef.id) return;
+
+      
         let msgData = {
           textID: newCityRef.id,
           oldID : data.oldId,
@@ -119,8 +123,8 @@ io.on('connection', function (socket) {
           // isMedia
         }
         socket.emit('sendMessage', msgData)
-      }
-      // if(!chatInfo) return;
+      
+
       const returnData = {
         message: data.message,
         textID: newCityRef.id,
@@ -134,42 +138,42 @@ io.on('connection', function (socket) {
       
       // if(chatInfo.groupID) connection.everySocketInLobby('sendMessage' , chatInfo.groupID , returnData)
       // else
-      if(data.friendId){
-        socket.to(roomId).emit('sendMessage', returnData);
-        // server.database.msgsRecieved(data.userId, data.friendId, () => {
-        //   socket.emit('msgsRecieved', { id : data.friendId})
-        //   friendConn.everySocket('msgsRecievedWhileNotTalkingWithUser', returnData)
-        // })
-      }
-    // })
+        socket.to(roomId).emit('sendMessage', returnData);  
   })
-  socket.on('showChatHistory', (data) => {
-    // if(!chatInfo) return;
 
-    // connection.log("Fetching chat history for user "+ ChatingWithUser.id)
-    // server.database.showChatHistory(userID, chatInfo.userID , chatInfo.groupID, data.page, (dataD) => {
+  socket.on('msgsSeen', async function (data) {
+          if(!data.friendId) return;
+          if(!data.userId) return;
 
-      // socket.emit('showChatHistory', {
-      //   refresh : data.refresh,
-      //   chatLog: dataD.chatLog,
-      //   name: user.name,
-      //   code: user.code,
-      //   page: data.page + 25,
-      //   unSeenMsgsCount : dataD.unSeenMsgsCount
-      // });
-      // if(socket && chatInfo && chatInfo.userID) socket.emit("removeMsgsRecievedAlert" , {
-      //   name: chatInfo.name,
-      //   code: chatInfo.code
-      // })
-      // if (!chatInfo) return;
-      // let myData = {
-      //   name: user.name,
-      //   code: user.code
-      // }
-      // if(data.friendId){
-        let roomId = data.userId+ "/" + data.friendId;
-          socket.to(roomId).emit('msgsSeen', { userId : data.userId })
-      // }
-    // })
-  });
+          let roomId = data.userId+ "/" + data.friendId;
+          const citiesRef2 = collection(db, "messages");
+          const q2 = query(citiesRef2, 
+            where("FromUser_ID", "==", data.friendId), 
+            where("ToUser_ID", "==", data.userId),
+            orderBy("Text_Date", "desc"),
+            limit(200)
+            );
+        const messages2 = await getDocs(q2);
+        messages2.docs.forEach(async msg =>{
+          await updateDoc(msg.ref, {
+            Text_Status: "recieved"
+          });
+        })
+        socket.to(roomId).emit('msgsRecieved')
+
+        const citiesRef = collection(db, "messages");
+        const q = query(citiesRef, 
+            where("FromUser_ID", "==", data.friendId), 
+            where("ToUser_ID", "==", data.userId),
+            orderBy("Text_Date", "desc"),
+            limit(200)
+        );
+        const messages = await getDocs(q);
+        messages.docs.forEach(async msg =>{
+          await updateDoc(msg.ref, {
+            Text_View: "seen"
+          });
+        })       
+      socket.to(roomId).emit('msgsSeen')
+  })
 })
