@@ -3,13 +3,13 @@ const express = require('express')
 const app = express()
 app.use(express.json())
 const { initializeApp } = require('firebase/app');
-const { getFirestore, collection, getDocs  , doc, setDoc , query , where , updateDoc , limit , orderBy} = require('firebase/firestore');
+const { getFirestore, collection, getDocs ,getDoc , doc, setDoc , query , where , updateDoc , limit , orderBy} = require('firebase/firestore');
 const server = require('http').Server(app)
 const io = require("socket.io")(server,
   {
     cors: {
-      origin: "https://chat-app-nextjs-ahmadmarhaba.vercel.app",
-      methods: ["GET", "POST"]
+      methods: ["GET", "POST"],
+      origin:"https://chat-app-nextjs-ahmadmarhaba.vercel.app", // 'http://localhost:3000'
     }
   }
   ); 
@@ -177,5 +177,65 @@ io.on('connection', function (socket) {
           });
         })       
       socket.to(roomId).emit('msgsSeen')
+  })
+  socket.on('deleteMsg', async function (data) {
+    if(!data.friendId) return;
+    if(!data.userId) return;
+    if(!data.textID) return;
+
+    const citiesRef = doc(db, "messages", data.textID);
+    const message = await getDoc(citiesRef);
+    await updateDoc(message.ref, {
+      Text_Flag: "inactive"
+    });
+    // if (!chatInfo) return;
+    // server.database.deleteMsg(userID, textID, () => {
+      let myData = {
+        textID : data.textID
+      }
+      // socket.emit('deleteMsg', myData);
+
+      let roomId = data.userId+ "/" + data.friendId;
+      io.in(roomId).emit('deleteMsg', myData)
+      // if(!chatInfo) return;
+      // if(chatInfo.userID){
+        // let friendConn = server.connections[chatInfo.userID]
+        // if (friendConn == null) return;
+      // }else if(chatInfo.groupID){
+      //   connection.everySocketInLobby('deleteMsg',chatInfo.groupID, myData)
+      // }
+    // })
+  })
+
+  socket?.on('editMsg', async function (data) {
+    if(!data.friendId) return;
+    if(!data.userId) return;
+    if(!data.textID) return;
+    if(!data.message) return;
+
+    
+    const citiesRef = doc(db, "messages", data.textID);
+    const message = await getDoc(citiesRef);
+    await updateDoc(message.ref, {
+      Text_Edit : 'edited'
+    });
+    
+    const text = data.message.trim()
+    // server.database.editMsg(userID, textID, message, () => {
+      let myData = {
+        textID: data.textID,
+        message : text
+      }
+      let roomId = data.userId+ "/" + data.friendId;
+      io.in(roomId).emit('editMsg', myData)
+      // if(!chatInfo) return;
+      // if(chatInfo.userID){
+        // let friendConn = server.connections[chatInfo.userID]
+        // if (friendConn == null) return;
+        // friendConn.everySocket('editMsg', myData)
+      // }else if(chatInfo.groupID){
+      //   connection.everySocketInLobby('editMsg',chatInfo.groupID, myData)
+      // }
+    // })
   })
 })
