@@ -8,7 +8,7 @@ const server = require('http').Server(app)
 const io = require("socket.io")(server,
   {
     cors: {
-      origin: "https://chat-app-nextjs-gamma.vercel.app",
+      origin: "https://chat-app-nextjs-ahmadmarhaba.vercel.app",
       methods: ["GET", "POST"]
     }
   }
